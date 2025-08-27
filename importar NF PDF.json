@@ -59,19 +59,6 @@
     },
     {
       "parameters": {
-        "jsCode": "  let teste = $input.first().json.output.replace(\"]]\", ']').replace(\"[[\", '[')\n  if(!teste.includes(\"[{\") || !teste.includes(\"}]\")){\n    teste = `[{${teste}}]`.replace(\"{{\", \"{\").replace(\"}}\", \"}\")\n  }\n  teste.replaceAll(\"\\n\", \"\").replaceAll(\"    \", \"\")\n  const result = JSON.parse(teste)\n\n  return result"
-      },
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        896,
-        48
-      ],
-      "id": "57d4d89f-3ebd-411f-a845-1e7b38ed2483",
-      "name": "Code"
-    },
-    {
-      "parameters": {
         "conditions": {
           "options": {
             "caseSensitive": true,
@@ -139,6 +126,86 @@
     },
     {
       "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "return $json"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1200,
+        48
+      ],
+      "id": "eed26e6f-c486-486a-8c26-14a2f71d0379",
+      "name": "Code1"
+    },
+    {
+      "parameters": {
+        "content": "## Webhook\n\nUse o webhook para receber uma requisição de um front ou backend, ele espera receber um pdf\n"
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        128,
+        64
+      ],
+      "typeVersion": 1,
+      "id": "191087da-040a-4129-b6a5-f50ffc2c0d81",
+      "name": "Sticky Note"
+    },
+    {
+      "parameters": {
+        "content": "## Ai Agent\n\nO Agente recebe o pdf e extrai informações conforme o prompt que receber"
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        528,
+        -64
+      ],
+      "typeVersion": 1,
+      "id": "cb3bdf86-4c1f-4e8a-bce9-7dec5a0a0a96",
+      "name": "Sticky Note1"
+    },
+    {
+      "parameters": {
+        "jsCode": "  let teste = $input.first().json.output.replace(\"]]\", ']').replace(\"[[\", '[')\n  if(!teste.includes(\"[{\") || !teste.includes(\"}]\")){\n    teste = `[{${teste}}]`.replace(\"{{\", \"{\").replace(\"}}\", \"}\")\n  }\n  teste.replaceAll(\"\\n\", \"\").replaceAll(\"    \", \"\")\n  const result = JSON.parse(teste)\n\n  return result"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        896,
+        48
+      ],
+      "id": "57d4d89f-3ebd-411f-a845-1e7b38ed2483",
+      "name": "Verificar Nulos"
+    },
+    {
+      "parameters": {
+        "content": "## Verificar Nulos\n\nVerifica se o valor de cada chave é nulo, se sim entra no loop"
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        864,
+        -128
+      ],
+      "typeVersion": 1,
+      "id": "52e230a2-8e51-41fd-a99c-1ff58fc24d0e",
+      "name": "Sticky Note2"
+    },
+    {
+      "parameters": {
+        "content": "## Sinalizador de erros\n\nRetorna os valores considerados errados e uma variável que sinaliza que houve um erro na execução anterior",
+        "height": 192
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1360,
+        288
+      ],
+      "typeVersion": 1,
+      "id": "d4167bee-83ff-4357-be5b-514181f56b9f",
+      "name": "Sticky Note3"
+    },
+    {
+      "parameters": {
         "assignments": {
           "assignments": [
             {
@@ -159,21 +226,7 @@
         224
       ],
       "id": "ce18b5ce-c666-4ab6-aa3e-8baef47bb0f5",
-      "name": "Edit Fields"
-    },
-    {
-      "parameters": {
-        "mode": "runOnceForEachItem",
-        "jsCode": "return $json"
-      },
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        1200,
-        48
-      ],
-      "id": "eed26e6f-c486-486a-8c26-14a2f71d0379",
-      "name": "Code1"
+      "name": "Sinalizador de erros"
     }
   ],
   "pinData": {},
@@ -204,18 +257,7 @@
       "main": [
         [
           {
-            "node": "Code",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Code": {
-      "main": [
-        [
-          {
-            "node": "If",
+            "node": "Verificar Nulos",
             "type": "main",
             "index": 0
           }
@@ -233,14 +275,30 @@
         ],
         [
           {
-            "node": "Edit Fields",
+            "node": "Sinalizador de erros",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Edit Fields": {
+    "Code1": {
+      "main": [
+        []
+      ]
+    },
+    "Verificar Nulos": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sinalizador de erros": {
       "main": [
         [
           {
@@ -256,7 +314,7 @@
   "settings": {
     "executionOrder": "v1"
   },
-  "versionId": "fe04361d-2d76-44af-a41c-861c7455a23e",
+  "versionId": "f8bf1336-cc1c-4863-9ad9-da13545666e9",
   "meta": {
     "templateCredsSetupCompleted": true,
     "instanceId": "abcf850f40a6c353be28eb69764fc3b8fe368ebccc4df1352134ea3af8b93e1d"
