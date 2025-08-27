@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Extrator PDF por Coordenadas → n8n</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js"></script>
+  <script src="https://unpkg.com/tesseract.js@5.0.3/dist/tesseract.min.js"></script>
+  <style>
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 16px; }
+    h2 { margin: 0 0 12px; }
+    .row { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin-bottom: 10px; }
+    label { font-size: 14px; }
+    input[type="text"], input[type="number"], textarea { width: 100%; max-width: 100%; padding: 6px 8px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+    textarea { height: 140px; }
+    button { padding: 8px 12px; cursor: pointer; }
+    .side { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    #previewWrap { position: relative; border: 1px solid #ddd; overflow: auto; max-height: 75vh; }
+    #pageCanvas { display: block; background: #f8f8f8; }
+    .region-box { position: absolute; border: 2px dashed #ff4d4f; pointer-events: none; }
+    .muted { color: #666; font-size: 12px; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
+    .card { border: 1px solid #e5e5e5; padding: 10px; border-radius: 6px; background: #fff; }
+  </style>
+</head>
+<body>
+  <h2>Extrair trechos específicos do PDF e enviar para n8n</h2>
+
+  <div class="grid">
+    <div class="card">
+      <div class="row">
+        <label>Arquivo PDF: <input type="file" id="pdfInput" accept="application/pdf"></label>
+      </div>
+      <div class="row">
+        <label>Webhook n8n (URL): <input type="text" id="webhook" value="http://localhost:5678/webhook-test/uploadpdf" placeholder="https://seu-n8n/webhook/xyz"></label>
+      </div>
+      <div class="row">
+        <label>Página para pré-visualização: <input type="number" id="pageNumber" min="1" value="1" style="width:80px"></label>
+        <label style="margin-left:12px">Escala de renderização: <input type="number" id="scale" step="0.25" min="0.5" value="2" style="width:80px"></label>
+        <label style="margin-left:12px">Idioma OCR: <input type="text" id="ocrLang" value="por" style="width:80px"></label>
+      </div>
+      <div class="row">
+        <button id="renderBtn">Renderizar página</button>
+        <button id="processBtn" style="background:#1677ff;color:#fff;border:1px solid #1677ff">Processar e Enviar</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <label>Regiões (JSON)
+        <textarea id="regionsJson" class="mono">[]</textarea>
+      </label>
+      <div class="muted">Formato: [{ name, page, x, y, width, height }]. Coordenadas em pixels sobre a página renderizada na escala configurada.</div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:14px;">
+    <div id="previewWrap">
+      <canvas id="pageCanvas"></canvas>
+      <!-- caixas desenhadas dinamicamente -->
+    </div>
+    <div class="muted">Dica: clique e arraste sobre a página para criar uma nova região. Ela será adicionada ao JSON automaticamente.</div>
+  </div>
+
+  <div class="card" style="margin-top:14px;">
+    <div><strong>Status</strong></div>
+    <pre id="status" class="mono" style="white-space:pre-wrap"></pre>
+    <div><strong>Resultados</strong></div>
+    <pre id="results" class="mono" style="white-space:pre-wrap"></pre>
+  </div>
+
+  <script>
+    const pdfjsLib = window['pdfjs-dist/build/pdf'];
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+    const statusEl = document.getElementById('status');
+    const resultsEl = document.getElementById('results');
+    const pageCanvas = document.getElementById('pageCanvas');
+    const previewWrap = document.getElementById('previewWrap');
+
+    let currentPdf = null;
+    let pdfArrayBuffer = null;
+    let currentPreviewPage = 1;
+    let currentScale = 2;
+
+    function setStatus(text) {
+      statusEl.textContent = text;
+    }
+
+    function parseRegions() {
+      try {
+        const arr = JSON.parse(document.getElementById('regionsJson').value);
+        if (!Array.isArray(arr)) throw new Error('JSON deve ser um array');
+        return arr;
+      } catch (e) {
+        throw new Error('Regiões (JSON) inválido: ' + e.message);
+      }
+    }
+
+    // Renderiza página para pré-visualização e desenha overlays
+    async function renderPreview() {
+      if (!currentPdf) { setStatus('Carregue um PDF.'); return; }
+      const pageNum = Math.max(1, parseInt(document.getElementById('pageNumber').value || '1', 10));
+      const scale = parseFloat(document.getElementById('scale').value || '2');
+      const page = await currentPdf.getPage(pageNum);
+      const viewport = page.getViewport({ scale });
+      const ctx = pageCanvas.getContext('2d');
+      pageCanvas.width = viewport.width;
+      pageCanvas.height = viewport.height;
+      await page.render({ canvasContext: ctx, viewport }).promise;
+
+      // Remover overlays antigos
+      [...document.querySelectorAll('.region-box')].forEach(n => n.remove());
+      // Desenhar overlays da página atual
+      let regions = [];
+      try { regions = parseRegions().filter(r => (r.page|0) === pageNum); } catch(e) { setStatus(e.message); return; }
+      for (const r of regions) {
+        const box = document.createElement('div');
+        box.className = 'region-box';
+        box.style.left = r.x + 'px';
+        box.style.top = r.y + 'px';
+        box.style.width = r.width + 'px';
+        box.style.height = r.height + 'px';
+        previewWrap.appendChild(box);
+      }
+      currentPreviewPage = pageNum;
+      currentScale = scale;
+      setStatus(`Página ${pageNum} renderizada (${Math.round(viewport.width)}×${Math.round(viewport.height)}) na escala ${scale}.`);
+    }
+
+    async function ensurePdfLoaded(file) {
+      pdfArrayBuffer = await file.arrayBuffer();
+      currentPdf = await pdfjsLib.getDocument({ data: pdfArrayBuffer }).promise;
+      setStatus(`PDF carregado. Páginas: ${currentPdf.numPages}.`);
+    }
+
+    // Corta uma região de uma página renderizada (com padding opcional)
+    async function cropRegion(pageIndex, region, scale) {
+      const page = await currentPdf.getPage(pageIndex);
+      const viewport = page.getViewport({ scale });
+      const tmpCanvas = document.createElement('canvas');
+      const tmpCtx = tmpCanvas.getContext('2d');
+      tmpCanvas.width = viewport.width;
+      tmpCanvas.height = viewport.height;
+      await page.render({ canvasContext: tmpCtx, viewport }).promise;
+
+      const pad = Math.max(0, parseInt(region.pad || 0, 10));
+      const x = Math.max(0, (region.x|0) - pad);
+      const y = Math.max(0, (region.y|0) - pad);
+      const width = Math.min(tmpCanvas.width - x, (region.width|0) + pad*2);
+      const height = Math.min(tmpCanvas.height - y, (region.height|0) + pad*2);
+      const crop = document.createElement('canvas');
+      const cctx = crop.getContext('2d');
+      crop.width = width;
+      crop.height = height;
+      cctx.drawImage(tmpCanvas, x, y, width, height, 0, 0, width, height);
+      return crop;
+    }
+
+    // Extrai texto nativo do PDF dentro de uma região
+    async function textFromRegion(pageIndex, region, scale) {
+      const page = await currentPdf.getPage(pageIndex);
+      const viewport = page.getViewport({ scale });
+      const content = await page.getTextContent();
+
+      const regionLeft = region.x|0;
+      const regionTop = region.y|0;
+      const regionWidth = region.width|0;
+      const regionHeight = region.height|0;
+
+      const within = (box) => {
+        const l1 = regionLeft, t1 = regionTop, r1 = regionLeft + regionWidth, b1 = regionTop + regionHeight;
+        const l2 = box.x, t2 = box.y, r2 = box.x + box.width, b2 = box.y + box.height;
+        return !(l2 > r1 || r2 < l1 || t2 > b1 || b2 < t1);
+      };
+
+      const boxes = [];
+      for (const item of content.items) {
+        const m = item.transform; // [a,b,c,d,e,f]
+        const mm = pdfjsLib.Util.transform(viewport.transform, m);
+        const x = mm[4];
+        const y = mm[5]; // baseline
+        const fontHeight = Math.hypot(mm[2], mm[3]);
+        const width = (item.width || 0) * viewport.scale;
+        const box = { x, y: y - fontHeight, width, height: fontHeight, str: item.str };
+        if (within(box)) boxes.push(box);
+      }
+
+      if (!boxes.length) return '';
+
+      // Ordena por y, depois x, e concatena com espaços heurísticos
+      boxes.sort((a,b) => (Math.round(a.y/2) - Math.round(b.y/2)) || (a.x - b.x));
+      let out = '';
+      let prev = null;
+      for (const b of boxes) {
+        if (prev) {
+          const sameLine = Math.abs((b.y) - (prev.y)) < Math.max(b.height, prev.height) * 0.6;
+          out += sameLine ? ' ' : '\n';
+        }
+        out += b.str;
+        prev = b;
+      }
+      return out.replace(/[\s\u00A0]+/g, ' ').trim();
+    }
+
+    // Pré-processamento para OCR: upscale + grayscale + Otsu binarization
+    function preprocessForOCR(srcCanvas, scaleFactor = 2) {
+      const w = Math.max(1, Math.floor(srcCanvas.width * scaleFactor));
+      const h = Math.max(1, Math.floor(srcCanvas.height * scaleFactor));
+      const dst = document.createElement('canvas');
+      dst.width = w; dst.height = h;
+      const dctx = dst.getContext('2d');
+      dctx.imageSmoothingEnabled = true;
+      dctx.imageSmoothingQuality = 'high';
+      dctx.drawImage(srcCanvas, 0, 0, w, h);
+
+      const img = dctx.getImageData(0, 0, w, h);
+      const data = img.data;
+      // grayscale
+      for (let i = 0; i < data.length; i += 4) {
+        const g = 0.2126*data[i] + 0.7152*data[i+1] + 0.0722*data[i+2];
+        data[i] = data[i+1] = data[i+2] = g;
+      }
+      // Otsu threshold
+      const hist = new Array(256).fill(0);
+      for (let i = 0; i < data.length; i += 4) hist[data[i]]++;
+      const total = w*h; let sum = 0; for (let t=0;t<256;t++) sum += t*hist[t];
+      let sumB=0, wB=0, varMax=0, thr=127;
+      for (let t=0;t<256;t++) { wB+=hist[t]; if(!wB) continue; const wF=total-wB; if(!wF) break; sumB+=t*hist[t]; const mB=sumB/wB; const mF=(sum-sumB)/wF; const v=wB*wF*(mB-mF)*(mB-mF); if(v>varMax){varMax=v;thr=t;} }
+      for (let i = 0; i < data.length; i += 4) {
+        const v = data[i] > thr ? 255 : 0;
+        data[i] = data[i+1] = data[i+2] = v;
+      }
+      dctx.putImageData(img, 0, 0);
+      return dst;
+    }
+
+    async function ocrCanvas(canvas, lang, regionOptions = {}) {
+      const pre = preprocessForOCR(canvas, 3); // upscale 3x para mais detalhe
+      const tessOptions = {
+        logger: m => { /* lento mas mais preciso */ },
+        tessedit_char_whitelist: regionOptions.whitelist || undefined,
+        tessedit_pageseg_mode: regionOptions.psm != null ? String(regionOptions.psm) : undefined
+      };
+      const { data: { text } } = await Tesseract.recognize(pre, lang, tessOptions);
+      return (text || '').replace(/[\s\n]+/g, ' ').trim();
+    }
+
+    // Localiza aproximadamente uma faixa que contenha o termo solicitado usando OCR por faixas horizontais
+    async function findTextRegionApprox(term, pageNum, scale) {
+      const page = await currentPdf.getPage(pageNum);
+      const viewport = page.getViewport({ scale });
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      canvas.width = viewport.width;
+      canvas.height = viewport.height;
+      await page.render({ canvasContext: ctx, viewport }).promise;
+
+      const stripeH = Math.max(40, Math.floor(canvas.height / 20));
+      for (let y = 0; y < canvas.height; y += stripeH) {
+        const h = Math.min(stripeH, canvas.height - y);
+        const stripe = document.createElement('canvas');
+        stripe.width = canvas.width;
+        stripe.height = h;
+        stripe.getContext('2d').drawImage(canvas, 0, y, canvas.width, h, 0, 0, canvas.width, h);
+        const { data: { text } } = await Tesseract.recognize(stripe, 'por');
+        const up = (text || '').toUpperCase();
+        if (up.includes(term.toUpperCase())) {
+          return { x: 0, y, width: canvas.width, height: h };
+        }
+      }
+      return null;
+    }
+
+    async function processAndSend() {
+      if (!currentPdf) { setStatus('Carregue um PDF.'); return; }
+      const webhook = (document.getElementById('webhook').value || '').trim();
+      if (!webhook) { setStatus('Informe a URL do webhook do n8n.'); return; }
+
+      let regions;
+      try { regions = parseRegions(); } catch (e) { setStatus(e.message); return; }
+      const scale = parseFloat(document.getElementById('scale').value || '2');
+      const lang = (document.getElementById('ocrLang').value || 'por').trim();
+
+      setStatus('Processando regiões e executando OCR...');
+      const results = {};
+      for (const region of regions) {
+        const pageIdx = Math.max(1, region.page|0);
+        // Primeiro tenta texto nativo do PDF nessa região
+        let text = await textFromRegion(pageIdx, region, scale);
+        if (!text) {
+          // Fallback: OCR mais preciso (lento)
+          const crop = await cropRegion(pageIdx, region, scale);
+          text = await ocrCanvas(crop, lang, { whitelist: region.whitelist, psm: region.psm });
+        }
+        results[region.name || `p${pageIdx}_${region.x}_${region.y}`] = text;
+      }
+
+      resultsEl.textContent = JSON.stringify(results, null, 2);
+      setStatus('Enviando para n8n...');
+      try {
+        const resp = await fetch(webhook, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ results })
+        });
+        setStatus(`Enviado. HTTP ${resp.status}.`);
+      } catch (e) {
+        setStatus('Falha ao enviar: ' + e.message);
+      }
+    }
+
+    document.getElementById('pdfInput').addEventListener('change', async (e) => {
+      const file = e.target.files && e.target.files[0];
+      if (!file) return;
+      try {
+        await ensurePdfLoaded(file);
+        document.getElementById('pageNumber').value = 1;
+        await renderPreview();
+      } catch (err) {
+        setStatus('Erro ao carregar PDF: ' + err.message);
+      }
+    });
+
+    document.getElementById('renderBtn').addEventListener('click', async () => {
+      try { await renderPreview(); } catch (e) { setStatus(e.message); }
+    });
+
+    document.getElementById('processBtn').addEventListener('click', async () => {
+      try { await processAndSend(); } catch (e) { setStatus('Erro: ' + e.message); }
+    });
+
+    // Removida a detecção automática
+
+    // ====== Ferramenta de desenho de regiões ======
+    (function enableDrawTool(){
+      let isDown = false;
+      let startX = 0, startY = 0;
+      let drawBox = null;
+      const toJSON = () => {
+        try { return JSON.parse(document.getElementById('regionsJson').value) || []; } catch { return []; }
+      };
+      const setJSON = (arr) => { document.getElementById('regionsJson').value = JSON.stringify(arr, null, 2); };
+      const getNextCampoName = (arr) => {
+        let maxNum = 0;
+        for (const r of arr) {
+          if (typeof r.name === 'string') {
+            const m = r.name.trim().match(/^campo\s*(\d+)$/i);
+            if (m) {
+              const n = parseInt(m[1], 10);
+              if (!isNaN(n) && n > maxNum) maxNum = n;
+            }
+          }
+        }
+        return `campo_${maxNum + 1}`;
+      };
+
+      function onDown(ev){
+        const rect = pageCanvas.getBoundingClientRect();
+        startX = (ev.clientX - rect.left) | 0;
+        startY = (ev.clientY - rect.top) | 0;
+        isDown = true;
+        drawBox = document.createElement('div');
+        drawBox.className = 'region-box';
+        drawBox.style.left = startX + 'px';
+        drawBox.style.top = startY + 'px';
+        drawBox.style.width = '1px';
+        drawBox.style.height = '1px';
+        previewWrap.appendChild(drawBox);
+      }
+      function onMove(ev){
+        if (!isDown || !drawBox) return;
+        const rect = pageCanvas.getBoundingClientRect();
+        const x = (ev.clientX - rect.left) | 0;
+        const y = (ev.clientY - rect.top) | 0;
+        const w = Math.max(1, x - startX);
+        const h = Math.max(1, y - startY);
+        drawBox.style.width = w + 'px';
+        drawBox.style.height = h + 'px';
+      }
+      function onUp(){
+        if (!isDown || !drawBox) return;
+        isDown = false;
+        const x = parseInt(drawBox.style.left,10);
+        const y = parseInt(drawBox.style.top,10);
+        const w = parseInt(drawBox.style.width,10);
+        const h = parseInt(drawBox.style.height,10);
+        const arr = toJSON();
+        const name = getNextCampoName(arr);
+        arr.push({ name, page: currentPreviewPage, x, y, width: w, height: h });
+        setJSON(arr);
+        drawBox = null;
+      }
+      pageCanvas.addEventListener('mousedown', onDown);
+      window.addEventListener('mousemove', onMove);
+      window.addEventListener('mouseup', onUp);
+    })();
+  </script>
+</body>
+</html>
+
+

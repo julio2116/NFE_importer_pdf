@@ -1,0 +1,266 @@
+{
+  "name": "importar NF PDF",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "uploadpdf",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        400,
+        144
+      ],
+      "id": "ef007dc5-ac93-4f33-977c-dee29293f509",
+      "name": "Webhook",
+      "webhookId": "d80dc976-b192-4c9f-bc7d-a148c0c9f7a6"
+    },
+    {
+      "parameters": {
+        "model": "openai/gpt-oss-120b",
+        "options": {
+          "maxTokensToSample": 4000,
+          "temperature": 0.3
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGroq",
+      "typeVersion": 1,
+      "position": [
+        576,
+        368
+      ],
+      "id": "ed3220ca-7865-418e-a7ec-059ebe5d53d0",
+      "name": "Groq Chat Model",
+      "credentials": {
+        "groqApi": {
+          "id": "Dc7vL5H0Vo1ghi2a",
+          "name": "Groq account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Você receberá o conteúdo da variável {{ $node[\"Webhook\"].json.body.results.campo_1 }}.\ncaso haja algum a valor após os dois pontos desta linha, considere que pode haver algum erro na escolha destes valores, principalmente se um dos valores possuir chave mas, o valor estiver zerado: {{ $node[\"Webhook\"].params ? JSON.stringify($json.params) : \"\" }}.\nSua tarefa é identificar todos os produtos mencionados nesse texto e retornar apenas um JSON válido (não inclua nenhum texto adicional, explicação ou comentário).\n\nFormato obrigatório para cada produto:\n\n{\n\"produto\": \"\",\n\"valor_unitario\": 0.0,\n\"quantidade\": 0.0,\n\"valor_total\": 0.0\n}\n\nRegras obrigatórias:\n\nNão inclua nenhum espaço extra no json final.\n\nNenhum campo (produto, valor_unitario, quantidade, valor_total) pode ficar vazio.\n\nSe algum campo não puder ser preenchido corretamente, ignore essa linha completamente.\n\nproduto deve ser constituído praticamente apenas de texto podendo ter mais de uma palavra.\n\nvalor_unitario, quantidade e valor_total devem ser apenas números com ponto como separador decimal.\n\nO valor de valor_unitario * quantidade deve ser exatamente igual a valor_total.\n\nSe os valores extraídos inicialmente não baterem, ajuste quantidade ou valor_unitario conforme indicado no texto para que a multiplicação seja exata.\n\nvalor_total deve ser sempre maior ou igual a valor_unitario.\n\nRetorne somente o JSON final, sem nada mais.\n\nSe houver mais de um produto, retorne um array de objetos JSON.\n\nIgnore qualquer texto irrelevante do documento.\n\nSe a lista for muito longa e houver risco de truncamento, divida a saída em partes sequenciais, mas garanta que cada parte seja um JSON válido, e depois combine-as para formar o JSON final completo.\n\nInstrução extra:\n\nCertifique-se de incluir todos os produtos completos presentes no texto, mesmo que a lista seja extensa.\n\nMantenha o formato exatamente como especificado, sem comentários ou explicações.\n\nIgnore qualquer código numérico de 9 dígitos.\n\nIgnore qualquer número de 3 dígitos que finalize com: 00, 10, 20, 30, 40, 41, 50, 51, 60, 70, 90.\n\nIgnore qualquer código de 4 dígitos que finalize com: 101, 102, 103, 201, 202, 203, 300, 400, 500, 900.",
+        "options": {
+          "returnIntermediateSteps": false
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 2.2,
+      "position": [
+        640,
+        144
+      ],
+      "id": "9622f34b-2b52-407b-94d7-1462fefaa851",
+      "name": "AI Agent"
+    },
+    {
+      "parameters": {
+        "jsCode": "  let teste = $input.first().json.output.replace(\"]]\", ']').replace(\"[[\", '[')\n  if(!teste.includes(\"[{\") || !teste.includes(\"}]\")){\n    teste = `[{${teste}}]`.replace(\"{{\", \"{\").replace(\"}}\", \"}\")\n  }\n  teste.replaceAll(\"\\n\", \"\").replaceAll(\"    \", \"\")\n  const result = JSON.parse(teste)\n\n  return result"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        896,
+        48
+      ],
+      "id": "57d4d89f-3ebd-411f-a845-1e7b38ed2483",
+      "name": "Code"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "2bdff67c-e157-40f0-8bff-679a91e3c5df",
+              "leftValue": "={{ $json.produto }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "exists",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "6c216993-5dab-4254-81f4-eb96d3a12bc0",
+              "leftValue": "={{ $json.valor_unitario }}",
+              "rightValue": "",
+              "operator": {
+                "type": "number",
+                "operation": "exists",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "da524bb2-eaed-4cb6-ac82-e2ffc37a168f",
+              "leftValue": "={{ $json.quantidade }}",
+              "rightValue": "",
+              "operator": {
+                "type": "number",
+                "operation": "exists",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "fe4582b7-ef6d-4991-bead-5c92ed560b48",
+              "leftValue": "={{ $json.valor_total }}",
+              "rightValue": "",
+              "operator": {
+                "type": "number",
+                "operation": "exists",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {
+          "ignoreCase": ""
+        }
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1040,
+        144
+      ],
+      "id": "e199adec-09ef-477a-a1c1-cd7b093843b7",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "1efaf047-3270-4aa4-9f8d-300baca871c2",
+              "name": "params",
+              "value": "={{ $('Webhook').item.json.params = {produto: $json.produto, valor_unitario: $json.valor_unitario, quantidade: $json.quantidade, valor_total: $json.valor_total} }}",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1200,
+        224
+      ],
+      "id": "ce18b5ce-c666-4ab6-aa3e-8baef47bb0f5",
+      "name": "Edit Fields"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "return $json"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1200,
+        48
+      ],
+      "id": "eed26e6f-c486-486a-8c26-14a2f71d0379",
+      "name": "Code1"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Groq Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Code",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Code1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "fe04361d-2d76-44af-a41c-861c7455a23e",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "abcf850f40a6c353be28eb69764fc3b8fe368ebccc4df1352134ea3af8b93e1d"
+  },
+  "id": "XEsksa4B0s9f7hGS",
+  "tags": []
+}
