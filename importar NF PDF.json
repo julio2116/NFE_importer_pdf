@@ -19,7 +19,7 @@
     },
     {
       "parameters": {
-        "model": "openai/gpt-oss-120b",
+        "model": "openai/gpt-oss-20b",
         "options": {
           "maxTokensToSample": 4000,
           "temperature": 0.3
@@ -43,7 +43,7 @@
     {
       "parameters": {
         "promptType": "define",
-        "text": "=Você receberá o conteúdo da variável {{ $node[\"Webhook\"].json.body.results.campo_1 }}.\ncaso haja algum a valor após os dois pontos desta linha, considere que pode haver algum erro na escolha destes valores, principalmente se um dos valores possuir chave mas, o valor estiver zerado: {{ $node[\"Webhook\"].params ? JSON.stringify($json.params) : \"\" }}.\nSua tarefa é identificar todos os produtos mencionados nesse texto e retornar apenas um JSON válido (não inclua nenhum texto adicional, explicação ou comentário).\n\nFormato obrigatório para cada produto:\n\n{\n\"produto\": \"\",\n\"valor_unitario\": 0.0,\n\"quantidade\": 0.0,\n\"valor_total\": 0.0\n}\n\nRegras obrigatórias:\n\nNão inclua nenhum espaço extra no json final.\n\nNenhum campo (produto, valor_unitario, quantidade, valor_total) pode ficar vazio.\n\nSe algum campo não puder ser preenchido corretamente, ignore essa linha completamente.\n\nproduto deve ser constituído praticamente apenas de texto podendo ter mais de uma palavra.\n\nvalor_unitario, quantidade e valor_total devem ser apenas números com ponto como separador decimal.\n\nO valor de valor_unitario * quantidade deve ser exatamente igual a valor_total.\n\nSe os valores extraídos inicialmente não baterem, ajuste quantidade ou valor_unitario conforme indicado no texto para que a multiplicação seja exata.\n\nvalor_total deve ser sempre maior ou igual a valor_unitario.\n\nRetorne somente o JSON final, sem nada mais.\n\nSe houver mais de um produto, retorne um array de objetos JSON.\n\nIgnore qualquer texto irrelevante do documento.\n\nSe a lista for muito longa e houver risco de truncamento, divida a saída em partes sequenciais, mas garanta que cada parte seja um JSON válido, e depois combine-as para formar o JSON final completo.\n\nInstrução extra:\n\nCertifique-se de incluir todos os produtos completos presentes no texto, mesmo que a lista seja extensa.\n\nMantenha o formato exatamente como especificado, sem comentários ou explicações.\n\nIgnore qualquer código numérico de 9 dígitos.\n\nIgnore qualquer número de 3 dígitos que finalize com: 00, 10, 20, 30, 40, 41, 50, 51, 60, 70, 90.\n\nIgnore qualquer código de 4 dígitos que finalize com: 101, 102, 103, 201, 202, 203, 300, 400, 500, 900.",
+        "text": "=Você receberá o conteúdo da variável {{ $node[\"Webhook\"].json.body.results.campo_2 }}.\ncaso haja algum a valor após os dois pontos desta linha, considere que pode haver algum erro na escolha destes valores, principalmente se um dos valores possuir chave mas, o valor estiver zerado: {{ $node[\"Webhook\"].params ? JSON.stringify($json.params) : \"\" }}.\nSua tarefa é identificar todos os produtos mencionados nesse texto e retornar apenas um JSON válido (não inclua nenhum texto adicional, explicação ou comentário).\n\nFormato obrigatório para cada produto:\n\n{\n\"produto\": \"\",\n\"valor_unitario\": 0.0,\n\"quantidade\": 0.0,\n\"valor_total\": 0.0\n}\n\nRegras obrigatórias:\n\nNão inclua nenhum espaço extra no json final.\n\nNenhum campo (produto, valor_unitario, quantidade, valor_total) pode ficar vazio.\n\nSe algum campo não puder ser preenchido corretamente, ignore essa linha completamente.\n\nproduto deve ser constituído praticamente apenas de texto podendo ter mais de uma palavra.\n\nvalor_unitario, quantidade e valor_total devem ser apenas números com ponto como separador decimal.\n\nO valor de valor_unitario * quantidade deve ser exatamente igual a valor_total.\n\nSe os valores extraídos inicialmente não baterem, ajuste quantidade ou valor_unitario conforme indicado no texto para que a multiplicação seja exata.\n\nvalor_total deve ser sempre maior ou igual a valor_unitario.\n\nRetorne somente o JSON final, sem nada mais.\n\nSe houver mais de um produto, retorne um array de objetos JSON.\n\nIgnore qualquer texto irrelevante do documento.\n\nSe a lista for muito longa e houver risco de truncamento, divida a saída em partes sequenciais, mas garanta que cada parte seja um JSON válido, e depois combine-as para formar o JSON final completo.\n\nInstrução extra:\n\nCertifique-se de incluir todos os produtos completos presentes no texto, mesmo que a lista seja extensa.\n\nMantenha o formato exatamente como especificado, sem comentários ou explicações.\n\nIgnore qualquer código numérico de 9 dígitos.\n\nIgnore qualquer número de 3 dígitos que finalize com: 00, 10, 20, 30, 40, 41, 50, 51, 60, 70, 90.\n\nIgnore qualquer código de 4 dígitos que finalize com: 101, 102, 103, 201, 202, 203, 300, 400, 500, 900.",
         "options": {
           "returnIntermediateSteps": false
         }
@@ -52,7 +52,7 @@
       "typeVersion": 2.2,
       "position": [
         640,
-        144
+        160
       ],
       "id": "9622f34b-2b52-407b-94d7-1462fefaa851",
       "name": "AI Agent"
@@ -69,7 +69,7 @@
           "conditions": [
             {
               "id": "2bdff67c-e157-40f0-8bff-679a91e3c5df",
-              "leftValue": "={{ $json.produto }}",
+              "leftValue": "={{ $json.produtos.some(item => item.produto) }}",
               "rightValue": "",
               "operator": {
                 "type": "string",
@@ -79,7 +79,7 @@
             },
             {
               "id": "6c216993-5dab-4254-81f4-eb96d3a12bc0",
-              "leftValue": "={{ $json.valor_unitario }}",
+              "leftValue": "={{ $json.produtos.some(item => item.valor_unitario) }}",
               "rightValue": "",
               "operator": {
                 "type": "number",
@@ -89,7 +89,7 @@
             },
             {
               "id": "da524bb2-eaed-4cb6-ac82-e2ffc37a168f",
-              "leftValue": "={{ $json.quantidade }}",
+              "leftValue": "={{ $json.produtos.some(item => item.quantidade) }}",
               "rightValue": "",
               "operator": {
                 "type": "number",
@@ -99,7 +99,7 @@
             },
             {
               "id": "fe4582b7-ef6d-4991-bead-5c92ed560b48",
-              "leftValue": "={{ $json.valor_total }}",
+              "leftValue": "={{ $json.produtos.some(item => item.valor_total) }}",
               "rightValue": "",
               "operator": {
                 "type": "number",
@@ -118,25 +118,11 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
       "position": [
-        1040,
-        144
+        1104,
+        48
       ],
       "id": "e199adec-09ef-477a-a1c1-cd7b093843b7",
       "name": "If"
-    },
-    {
-      "parameters": {
-        "mode": "runOnceForEachItem",
-        "jsCode": "return $json"
-      },
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        1200,
-        48
-      ],
-      "id": "eed26e6f-c486-486a-8c26-14a2f71d0379",
-      "name": "Code1"
     },
     {
       "parameters": {
@@ -145,7 +131,7 @@
       "type": "n8n-nodes-base.stickyNote",
       "position": [
         128,
-        64
+        96
       ],
       "typeVersion": 1,
       "id": "191087da-040a-4129-b6a5-f50ffc2c0d81",
@@ -157,8 +143,8 @@
       },
       "type": "n8n-nodes-base.stickyNote",
       "position": [
-        528,
-        -64
+        592,
+        -16
       ],
       "typeVersion": 1,
       "id": "cb3bdf86-4c1f-4e8a-bce9-7dec5a0a0a96",
@@ -166,12 +152,12 @@
     },
     {
       "parameters": {
-        "jsCode": "  let teste = $input.first().json.output.replace(\"]]\", ']').replace(\"[[\", '[')\n  if(!teste.includes(\"[{\") || !teste.includes(\"}]\")){\n    teste = `[{${teste}}]`.replace(\"{{\", \"{\").replace(\"}}\", \"}\")\n  }\n  teste.replaceAll(\"\\n\", \"\").replaceAll(\"    \", \"\")\n  const result = JSON.parse(teste)\n\n  return result"
+        "jsCode": "  let teste = $input.first().json.output.replace(\"]]\", ']').replace(\"[[\", '[')\n  if(!teste.includes(\"[{\") || !teste.includes(\"}]\")){\n    teste = `[{${teste}}]`.replace(\"{{\", \"{\").replace(\"}}\", \"}\")\n  }\n  teste.replaceAll(\"\\n\", \"\").replaceAll(\"    \", \"\")\n  const result = JSON.parse(teste) || {produtos: null}\n\n  return {produtos: result}"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        896,
+        912,
         48
       ],
       "id": "57d4d89f-3ebd-411f-a845-1e7b38ed2483",
@@ -183,7 +169,7 @@
       },
       "type": "n8n-nodes-base.stickyNote",
       "position": [
-        864,
+        896,
         -128
       ],
       "typeVersion": 1,
@@ -197,8 +183,8 @@
       },
       "type": "n8n-nodes-base.stickyNote",
       "position": [
-        1360,
-        288
+        1216,
+        336
       ],
       "typeVersion": 1,
       "id": "d4167bee-83ff-4357-be5b-514181f56b9f",
@@ -222,11 +208,61 @@
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
       "position": [
-        1200,
-        224
+        1264,
+        176
       ],
       "id": "ce18b5ce-c666-4ab6-aa3e-8baef47bb0f5",
       "name": "Sinalizador de erros"
+    },
+    {
+      "parameters": {
+        "jsCode": "const texto = $input.first().json.body.results.campo_1\n\nconst regexChave = /(?:\\b\\d{4}\\b\\s?){11}/g;\nconst regexData = /(0[1-9]|[12][0-9]|3[01])\\/(0[1-9]|1[0-2])\\/\\d{4}/\n\nconst matchChave = texto.match(regexChave);\nconst matchData = texto.match(regexData);\n\nconst chave = matchChave[0].replaceAll(\" \", \"\")\nif(!chave) return {\"Erro\": \"Erro ao capturar a chave\"}\n\nconst emissao = matchData[0]\nif(!emissao) return {\"Erro\": \"Erro ao capturar a data de emissão\"}\n\nconst numero = chave.slice(25, 34)\nconst cnpj = chave.slice(6, 20)\n\nif(!cnpj) return {\"Erro\": \"Erro ao capturar a CNPJ\"}\n\nconst url = `https://www.receitaws.com.br/v1/cnpj/${cnpj}`;\n\nconst response = await this.helpers.request({\n    method: 'GET',\n    url: url,\n    json: true,\n    headers: {\n        'User-Agent': 'n8n',\n    },\n});\n\nconst emitente = response.fantasia || response.nome\n\nif(!emitente) return {\"Erro\": \"Erro ao capturar o emitente\"}\n\nreturn {chave, numero, cnpj, emissao, emitente}"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        544,
+        -160
+      ],
+      "id": "e2df5698-414d-4cb2-a4be-546de3078dd5",
+      "name": "Capturar chave"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        1312,
+        -144
+      ],
+      "id": "9d940474-06fd-430d-bbeb-9a4383b13520",
+      "name": "Merge"
+    },
+    {
+      "parameters": {
+        "jsCode": "console.log($input.all())\nreturn $input.all()"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1520,
+        -144
+      ],
+      "id": "2c4f0eea-51ee-40e4-8d6a-f617954fecf4",
+      "name": "Code"
+    },
+    {
+      "parameters": {
+        "content": "## Merge\n\nAguarda toda a informação carregar"
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1344,
+        0
+      ],
+      "typeVersion": 1,
+      "id": "c0fa5d3e-2945-46ca-94c4-feb2e59cdd54",
+      "name": "Sticky Note4"
     }
   ],
   "pinData": {},
@@ -234,6 +270,11 @@
     "Webhook": {
       "main": [
         [
+          {
+            "node": "Capturar chave",
+            "type": "main",
+            "index": 0
+          },
           {
             "node": "AI Agent",
             "type": "main",
@@ -268,9 +309,9 @@
       "main": [
         [
           {
-            "node": "Code1",
+            "node": "Merge",
             "type": "main",
-            "index": 0
+            "index": 1
           }
         ],
         [
@@ -280,11 +321,6 @@
             "index": 0
           }
         ]
-      ]
-    },
-    "Code1": {
-      "main": [
-        []
       ]
     },
     "Verificar Nulos": {
@@ -308,13 +344,35 @@
           }
         ]
       ]
+    },
+    "Capturar chave": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "Code",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "active": false,
   "settings": {
     "executionOrder": "v1"
   },
-  "versionId": "f8bf1336-cc1c-4863-9ad9-da13545666e9",
+  "versionId": "b5caf518-651d-43b8-adb7-3eeb05824ab0",
   "meta": {
     "templateCredsSetupCompleted": true,
     "instanceId": "abcf850f40a6c353be28eb69764fc3b8fe368ebccc4df1352134ea3af8b93e1d"
