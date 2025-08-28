@@ -342,6 +342,7 @@
         try { return JSON.parse(document.getElementById('regionsJson').value) || []; } catch { return []; }
       };
       const setJSON = (arr) => { document.getElementById('regionsJson').value = JSON.stringify(arr, null, 2); };
+      let field = 0;
       const getNextCampoName = (arr) => {
         let maxNum = 0;
         for (const r of arr) {
@@ -353,7 +354,8 @@
             }
           }
         }
-        return `campo_${maxNum + 1}`;
+        field++
+        return `campo_${maxNum + field}`;
       };
 
       function onDown(ev){
