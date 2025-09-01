@@ -10,8 +10,8 @@
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2.1,
       "position": [
-        400,
-        144
+        416,
+        112
       ],
       "id": "ef007dc5-ac93-4f33-977c-dee29293f509",
       "name": "Webhook",
@@ -19,17 +19,17 @@
     },
     {
       "parameters": {
-        "model": "openai/gpt-oss-20b",
+        "model": "openai/gpt-oss-120b",
         "options": {
-          "maxTokensToSample": 4000,
+          "maxTokensToSample": 8000,
           "temperature": 0.3
         }
       },
       "type": "@n8n/n8n-nodes-langchain.lmChatGroq",
       "typeVersion": 1,
       "position": [
-        576,
-        368
+        640,
+        256
       ],
       "id": "ed3220ca-7865-418e-a7ec-059ebe5d53d0",
       "name": "Groq Chat Model",
@@ -52,7 +52,7 @@
       "typeVersion": 2.2,
       "position": [
         640,
-        160
+        112
       ],
       "id": "9622f34b-2b52-407b-94d7-1462fefaa851",
       "name": "AI Agent"
@@ -143,8 +143,8 @@
       },
       "type": "n8n-nodes-base.stickyNote",
       "position": [
-        592,
-        -16
+        640,
+        -64
       ],
       "typeVersion": 1,
       "id": "cb3bdf86-4c1f-4e8a-bce9-7dec5a0a0a96",
@@ -216,7 +216,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const texto = $input.first().json.body.results.campo_1\n\nconst regexChave = /(?:\\b\\d{4}\\b\\s?){11}/g;\nconst regexData = /(0[1-9]|[12][0-9]|3[01])\\/(0[1-9]|1[0-2])\\/\\d{4}/\n\nconst matchChave = texto.match(regexChave);\nconst matchData = texto.match(regexData);\n\nconst chave = matchChave[0].replaceAll(\" \", \"\")\nif(!chave) return {\"Erro\": \"Erro ao capturar a chave\"}\n\nconst emissao = matchData[0]\nif(!emissao) return {\"Erro\": \"Erro ao capturar a data de emissão\"}\n\nconst numero = chave.slice(25, 34)\nconst cnpj = chave.slice(6, 20)\n\nif(!cnpj) return {\"Erro\": \"Erro ao capturar a CNPJ\"}\n\nconst url = `https://www.receitaws.com.br/v1/cnpj/${cnpj}`;\n\nconst response = await this.helpers.request({\n    method: 'GET',\n    url: url,\n    json: true,\n    headers: {\n        'User-Agent': 'n8n',\n    },\n});\n\nconst emitente = response.fantasia || response.nome\n\nif(!emitente) return {\"Erro\": \"Erro ao capturar o emitente\"}\n\nreturn {chave, numero, cnpj, emissao, emitente}"
+        "jsCode": "const texto = $input.first().json.body.results.campo_1\n\nconst regexChave = /(?:\\b\\d{4}\\b\\s?){11}/g;\nconst regexData = /(0[1-9]|[12][0-9]|3[01])\\/(0[1-9]|1[0-2])\\/\\d{4}/\n\nlet matchChave = texto.match(regexChave);\nif(!matchChave) matchChave = texto.match(/(?:\\d\\s*){44}/g)\nconst matchData = texto.match(regexData);\n\nconst chave = matchChave[0].replaceAll(\" \", \"\").replaceAll(\"\\n\", \"\")\nif(!chave) return {\"Erro\": \"Erro ao capturar a chave\"}\nconst emissao = matchData[0]\nif(!emissao) return {\"Erro\": \"Erro ao capturar a data de emissão\"}\n\nconst numero = chave.slice(25, 34).replaceAll(\"\\n\", \"\")\nconst cnpj = chave.slice(6, 20).replaceAll(\"\\n\", \"\")\n\nif(!cnpj) return {\"Erro\": \"Erro ao capturar a CNPJ\"}\n\nconst url = `https://www.receitaws.com.br/v1/cnpj/${cnpj}`;\n\nconst response = await this.helpers.request({\n    method: 'GET',\n    url: url,\n    json: true,\n    headers: {\n        'User-Agent': 'n8n',\n    },\n});\n\nconst emitente = response.fantasia || response.nome\n\nif(!emitente) return {\"Erro\": \"Erro ao capturar o emitente\"}\n\nreturn {chave, numero, cnpj, emissao, emitente}"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -372,7 +372,7 @@
   "settings": {
     "executionOrder": "v1"
   },
-  "versionId": "b5caf518-651d-43b8-adb7-3eeb05824ab0",
+  "versionId": "113bad7b-b626-4a5e-8e94-5e70d24036d3",
   "meta": {
     "templateCredsSetupCompleted": true,
     "instanceId": "abcf850f40a6c353be28eb69764fc3b8fe368ebccc4df1352134ea3af8b93e1d"

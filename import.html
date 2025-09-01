@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Importar PDF NFe</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js"></script>
+    <script src="https://unpkg.com/tesseract.js@5.0.3/dist/tesseract.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .container {
+            background: #f5f5f5;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        input[type="file"] {
+            margin: 10px 0;
+            padding: 10px;
+            border: 2px dashed #ccc;
+            border-radius: 4px;
+            width: 100%;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .status {
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 4px;
+        }
+        .success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        .mono {
+            font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Importar PDF NFe</h1>
+        <p>Selecione um arquivo PDF para extrair informações:</p>
+        
+        <input type="file" id="pdfInput" accept=".pdf" />
+        
+        <button id="processBtn" disabled>Processar PDF</button>
+        
+        <div id="status"></div>
+        
+        <div id="results" class="mono" style="margin-top: 20px; padding: 10px; background: #f8f9fa; border-radius: 4px; white-space: pre-wrap; max-height: 300px; overflow-y: auto;"></div>
+    </div>
+
+<script>
+    const pdfjsLib = window["pdfjs-dist/build/pdf"];
+    pdfjsLib.GlobalWorkerOptions.workerSrc =
+        "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+
+    let currentPdf = null;
+    let pdfArrayBuffer = null;
+
+    function parseRegions(pages) {
+        const areas = [
+            {
+                "name": "campo_1",
+                "page": 1,
+                "x": 553,
+                "y": 48,
+                "width": 727,
+                "height": 485
+            },
+            {
+                "name": "campo_2",
+                "page": 1,
+                "x": 100,
+                "y": 650,
+                "width": 1100,
+                "height": 880
+            }
+        ];
+
+        // Adiciona campo_2 para cada página adicional
+        for (let page = 2; page <= pages; page++) {
+            areas.push({
+                "name": `campo_2_p${page}`,
+                "page": page,
+                "x": 100,
+                "y": 850,
+                "width": 1100,
+                "height": 680
+            });
+        }
+
+        return areas;
+    }
+
+    async function ensurePdfLoaded(file) {
+        pdfArrayBuffer = await file.arrayBuffer();
+        currentPdf = await pdfjsLib.getDocument({ data: pdfArrayBuffer }).promise;
+    }
+
+    // Extrai texto nativo do PDF dentro de uma região
+    async function textFromRegion(pageIndex, region, scale) {
+        const page = await currentPdf.getPage(pageIndex);
+        const viewport = page.getViewport({ scale });
+        const content = await page.getTextContent();
+
+        const regionLeft = region.x | 0;
+        const regionTop = region.y | 0;
+        const regionWidth = region.width | 0;
+        const regionHeight = region.height | 0;
+
+        const within = (box) => {
+            const l1 = regionLeft,
+                t1 = regionTop,
+                r1 = regionLeft + regionWidth,
+                b1 = regionTop + regionHeight;
+            const l2 = box.x,
+                t2 = box.y,
+                r2 = box.x + box.width,
+                b2 = box.y + box.height;
+            return !(l2 > r1 || r2 < l1 || t2 > b1 || b2 < t1);
+        };
+
+        const boxes = [];
+        for (const item of content.items) {
+            const m = item.transform; // [a,b,c,d,e,f]
+            const mm = pdfjsLib.Util.transform(viewport.transform, m);
+            const x = mm[4];
+            const y = mm[5]; // baseline
+            const fontHeight = Math.hypot(mm[2], mm[3]);
+            const width = (item.width || 0) * viewport.scale;
+            const box = {
+                x,
+                y: y - fontHeight,
+                width,
+                height: fontHeight,
+                str: item.str,
+            };
+            if (within(box)) boxes.push(box);
+        }
+
+        if (!boxes.length) return "";
+
+        // Ordena por y, depois x, e concatena com espaços heurísticos
+        boxes.sort(
+            (a, b) => Math.round(a.y / 2) - Math.round(b.y / 2) || a.x - b.x
+        );
+        let out = "";
+        let prev = null;
+        for (const b of boxes) {
+            if (prev) {
+                const sameLine =
+                    Math.abs(b.y - prev.y) < Math.max(b.height, prev.height) * 0.6;
+                out += sameLine ? " " : "\n";
+            }
+            out += b.str;
+            prev = b;
+        }
+        // Preserva quebras de linha e limpa apenas espaços extras
+        let result = out.trim();
+        
+        // Remove espaços extras mas mantém quebras de linha
+        result = result.replace(/[ \t\u00A0]+/g, ' '); // Substitui múltiplos espaços/tabs por um espaço
+        result = result.replace(/ \n/g, '\n'); // Remove espaços antes de quebras de linha
+        result = result.replace(/\n /g, '\n'); // Remove espaços depois de quebras de linha
+        result = result.replace(/\n{3,}/g, '\n\n'); // Limita quebras de linha consecutivas a máximo 2
+        
+        return result;
+    }
+
+    // Corta uma região de uma página renderizada (com padding opcional)
+    async function cropRegion(pageIndex, region, scale) {
+        const page = await currentPdf.getPage(pageIndex);
+        const viewport = page.getViewport({ scale });
+        const tmpCanvas = document.createElement('canvas');
+        const tmpCtx = tmpCanvas.getContext('2d');
+        tmpCanvas.width = viewport.width;
+        tmpCanvas.height = viewport.height;
+        await page.render({ canvasContext: tmpCtx, viewport }).promise;
+
+        const pad = Math.max(0, parseInt(region.pad || 0, 10));
+        const x = Math.max(0, (region.x|0) - pad);
+        const y = Math.max(0, (region.y|0) - pad);
+        const width = Math.min(tmpCanvas.width - x, (region.width|0) + pad*2);
+        const height = Math.min(tmpCanvas.height - y, (region.height|0) + pad*2);
+        const crop = document.createElement('canvas');
+        const cctx = crop.getContext('2d');
+        crop.width = width;
+        crop.height = height;
+        cctx.drawImage(tmpCanvas, x, y, width, height, 0, 0, width, height);
+        return crop;
+    }
+
+    // Pré-processamento para OCR: upscale + grayscale + Otsu binarization
+    function preprocessForOCR(srcCanvas, scaleFactor = 2) {
+        const w = Math.max(1, Math.floor(srcCanvas.width * scaleFactor));
+        const h = Math.max(1, Math.floor(srcCanvas.height * scaleFactor));
+        const dst = document.createElement('canvas');
+        dst.width = w; dst.height = h;
+        const dctx = dst.getContext('2d');
+        dctx.imageSmoothingEnabled = true;
+        dctx.imageSmoothingQuality = 'high';
+        dctx.drawImage(srcCanvas, 0, 0, w, h);
+
+        const img = dctx.getImageData(0, 0, w, h);
+        const data = img.data;
+        // grayscale
+        for (let i = 0; i < data.length; i += 4) {
+            const g = 0.2126*data[i] + 0.7152*data[i+1] + 0.0722*data[i+2];
+            data[i] = data[i+1] = data[i+2] = g;
+        }
+        // Otsu threshold
+        const hist = new Array(256).fill(0);
+        for (let i = 0; i < data.length; i += 4) hist[data[i]]++;
+        const total = w*h; let sum = 0; for (let t=0;t<256;t++) sum += t*hist[t];
+        let sumB=0, wB=0, varMax=0, thr=127;
+        for (let t=0;t<256;t++) { wB+=hist[t]; if(!wB) continue; const wF=total-wB; if(!wF) break; sumB+=t*hist[t]; const mB=sumB/wB; const mF=(sum-sumB)/wF; const v=wB*wF*(mB-mF)*(mB-mF); if(v>varMax){varMax=v;thr=t;} }
+        for (let i = 0; i < data.length; i += 4) {
+            const v = data[i] > thr ? 255 : 0;
+            data[i] = data[i+1] = data[i+2] = v;
+        }
+        dctx.putImageData(img, 0, 0);
+        return dst;
+    }
+
+    async function ocrCanvas(canvas, lang, regionOptions = {}) {
+        const pre = preprocessForOCR(canvas, 3); // upscale 3x para mais detalhe
+        const tessOptions = {
+            logger: m => { /* lento mas mais preciso */ },
+            tessedit_char_whitelist: regionOptions.whitelist || undefined,
+            tessedit_pageseg_mode: regionOptions.psm != null ? String(regionOptions.psm) : '6', // PSM 6 = bloco uniforme de texto
+            preserve_interword_spaces: '1' // Preserva espaços entre palavras
+        };
+        const { data: { text } } = await Tesseract.recognize(pre, lang, tessOptions);
+        
+        // Preserva quebras de linha e limpa apenas espaços extras
+        let result = (text || '').trim();
+        
+        // Remove espaços extras mas mantém quebras de linha
+        result = result.replace(/[ \t]+/g, ' '); // Substitui múltiplos espaços/tabs por um espaço
+        result = result.replace(/ \n/g, '\n'); // Remove espaços antes de quebras de linha
+        result = result.replace(/\n /g, '\n'); // Remove espaços depois de quebras de linha
+        result = result.replace(/\n{3,}/g, '\n\n'); // Limita quebras de linha consecutivas a máximo 2
+        
+        return result;
+    }
+
+    function showStatus(message, type = 'success') {
+        const statusDiv = document.getElementById('status');
+        statusDiv.innerHTML = `<div class="status ${type}">${message}</div>`;
+    }
+
+    function showResults(results) {
+        const resultsDiv = document.getElementById('results');
+        
+        // Mostra os resultados com quebras de linha visíveis
+        let displayText = '';
+        for (const [key, value] of Object.entries(results)) {
+            displayText += `${key}:\n`;
+            displayText += `"${value.replace(/\n/g, '\\n')}"\n\n`;
+        }
+        
+        resultsDiv.textContent = displayText;
+        
+        // Também mostra o JSON completo
+        console.log('Resultados completos:', results);
+    }
+
+    async function processAndSend() {
+        if (!currentPdf) {
+            showStatus('Por favor, selecione um arquivo PDF primeiro.', 'error');
+            return;
+        }
+
+        showStatus('Processando PDF...', 'info');
+        
+        const webhook = 'http://localhost:5678/webhook-test/uploadpdf';
+        const numPages = currentPdf.numPages;
+
+        let regions;
+        try {
+            regions = parseRegions(numPages);
+        } catch (e) {
+            showStatus('Erro ao processar regiões: ' + e.message, 'error');
+            return;
+        }
+        
+        const scale = 2.0;
+        const lang = 'por'; // Português para OCR
+        const results = {};
+        
+        showStatus(`Processando ${regions.length} região(ões) com OCR...`, 'info');
+        
+        for (let i = 0; i < regions.length; i++) {
+            const region = regions[i];
+            const pageIdx = Math.max(1, region.page | 0);
+            
+            showStatus(`Processando região ${i + 1}/${regions.length}: ${region.name} (página ${pageIdx})...`, 'info');
+            
+            // Primeiro tenta texto nativo do PDF nessa região
+            let text = await textFromRegion(pageIdx, region, scale);
+            
+            if (!text || text.trim().length < 3) {
+                // Fallback: OCR mais preciso (lento)
+                showStatus(`Texto nativo insuficiente, aplicando OCR na região ${region.name}...`, 'info');
+                const crop = await cropRegion(pageIdx, region, scale);
+                text = await ocrCanvas(crop, lang, { 
+                    whitelist: region.whitelist, 
+                    psm: region.psm 
+                });
+            }
+            
+            results[region.name || `p${pageIdx}_${region.x}_${region.y}`] = text;
+        }
+
+        // Mostra os resultados na tela
+        showResults(results);
+
+        try {
+            const resp = await fetch(webhook, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ results }),
+            });
+
+            if (resp.ok) {
+                showStatus(`PDF processado com sucesso! ${numPages} página(s) processada(s). Dados enviados para o webhook.`, 'success');
+            } else {
+                showStatus('Erro ao enviar dados para o webhook.', 'error');
+            }
+
+        } catch (e) {
+            showStatus("Falha ao enviar: " + e.message, 'error');
+        }
+    }
+
+    document.getElementById("pdfInput").addEventListener("change", async (e) => {
+        const file = e.target.files && e.target.files[0];
+        const processBtn = document.getElementById("processBtn");
+        
+        if (!file) {
+            processBtn.disabled = true;
+            showStatus('', '');
+            document.getElementById('results').textContent = '';
+            return;
+        }
+        
+        try {
+            showStatus('Carregando PDF...', 'info');
+            await ensurePdfLoaded(file);
+            processBtn.disabled = false;
+            showStatus(`PDF carregado com sucesso! ${currentPdf.numPages} página(s) encontrada(s).`, 'success');
+        } catch (err) {
+            processBtn.disabled = true;
+            showStatus("Erro ao carregar PDF: " + err.message, 'error');
+        }
+    });
+
+    document.getElementById("processBtn").addEventListener("click", async () => {
+        try {
+            await processAndSend();
+        } catch (e) {
+            showStatus("Erro: " + e.message, 'error');
+        }
+    });
+</script>
+</body>
+</html>
