@@ -10,8 +10,8 @@
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2.1,
       "position": [
-        416,
-        112
+        -96,
+        -144
       ],
       "id": "ef007dc5-ac93-4f33-977c-dee29293f509",
       "name": "Webhook",
@@ -19,20 +19,38 @@
     },
     {
       "parameters": {
+        "promptType": "define",
+        "text": "=Você receberá o conteúdo da variável {{ $json.campo_2 }}.\n\nSua tarefa é identificar todos os produtos mencionados nesse texto e retornar apenas um JSON válido (não inclua nenhum texto adicional, explicação ou comentário).\n\nMantenha o formato exatamente como especificado, sem comentários, explicações ou informações extras, formato obrigatório para cada produto:\n\n{\n\"produto\": \"\",\n\"valor_unitario\": 0.0,\n\"quantidade\": 0.0,\n\"valor_total\": 0.0\n}\n\nVocê irá executar o comando do prompt, seguindo sempre as regras abaixo:\n\nRegras obrigatórias:\n\nNão inclua nenhum espaço extra no json final.\n\nNenhum campo (produto, valor_unitario, quantidade, valor_total) pode ficar vazio.\n\nSe algum campo não puder ser preenchido corretamente, ignore essa linha completamente.\n\nproduto deve ser constituído praticamente apenas de texto podendo ter mais de uma palavra.\n\nvalor_unitario, quantidade e valor_total devem ser apenas números com ponto como separador decimal.\n\nO valor de valor_unitario * quantidade deve ser exatamente igual a valor_total.\n\nSe os valores extraídos inicialmente não baterem, ajuste quantidade ou valor_unitario conforme indicado no texto para que a multiplicação seja exata.\n\nvalor_total deve ser sempre maior ou igual a valor_unitario.\n\nRetorne somente o JSON final, sem nada mais.\n\nSe houver mais de um produto, retorne um array de objetos JSON.\n\nIgnore qualquer texto irrelevante do documento.\n\nSe a lista for muito longa e houver risco de truncamento, divida a saída em partes sequenciais, mas garanta que cada parte seja um JSON válido, e depois combine-as para formar o JSON final completo.\n\nInstrução extra:\n\nCertifique-se de incluir todos os produtos completos presentes no texto, mesmo que a lista seja extensa.\n\nMantenha o formato exatamente como especificado, sem comentários, explicações ou informações extras.\n\nIgnore qualquer código numérico de 9 dígitos.\n\nIgnore qualquer número de 3 dígitos que finalize com: 00, 10, 20, 30, 40, 41, 50, 51, 60, 70, 90.\n\nIgnore qualquer código de 4 dígitos que finalize com: 101, 102, 103, 201, 202, 203, 300, 400, 500, 900.\n\nEm seguida, a saída final deve ser:\n\n{\n  \"produto\": \"\",\n  \"valor_unitario\": 0.0,\n  \"quantidade\": 0.0,\n  \"valor_total\": 0.0\n}",
+        "needsFallback": true,
+        "options": {
+          "maxIterations": 1
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 2.2,
+      "position": [
+        560,
+        -80
+      ],
+      "id": "9622f34b-2b52-407b-94d7-1462fefaa851",
+      "name": "AI Agent"
+    },
+    {
+      "parameters": {
         "model": "openai/gpt-oss-120b",
         "options": {
-          "maxTokensToSample": 8000,
-          "temperature": 0.3
+          "maxTokensToSample": 20000,
+          "temperature": 0.5
         }
       },
       "type": "@n8n/n8n-nodes-langchain.lmChatGroq",
       "typeVersion": 1,
       "position": [
-        640,
-        256
+        512,
+        112
       ],
       "id": "ed3220ca-7865-418e-a7ec-059ebe5d53d0",
-      "name": "Groq Chat Model",
+      "name": "Principal",
       "credentials": {
         "groqApi": {
           "id": "Dc7vL5H0Vo1ghi2a",
@@ -42,227 +60,143 @@
     },
     {
       "parameters": {
-        "promptType": "define",
-        "text": "=Você receberá o conteúdo da variável {{ $node[\"Webhook\"].json.body.results.campo_2 }}.\ncaso haja algum a valor após os dois pontos desta linha, considere que pode haver algum erro na escolha destes valores, principalmente se um dos valores possuir chave mas, o valor estiver zerado: {{ $node[\"Webhook\"].params ? JSON.stringify($json.params) : \"\" }}.\nSua tarefa é identificar todos os produtos mencionados nesse texto e retornar apenas um JSON válido (não inclua nenhum texto adicional, explicação ou comentário).\n\nFormato obrigatório para cada produto:\n\n{\n\"produto\": \"\",\n\"valor_unitario\": 0.0,\n\"quantidade\": 0.0,\n\"valor_total\": 0.0\n}\n\nRegras obrigatórias:\n\nNão inclua nenhum espaço extra no json final.\n\nNenhum campo (produto, valor_unitario, quantidade, valor_total) pode ficar vazio.\n\nSe algum campo não puder ser preenchido corretamente, ignore essa linha completamente.\n\nproduto deve ser constituído praticamente apenas de texto podendo ter mais de uma palavra.\n\nvalor_unitario, quantidade e valor_total devem ser apenas números com ponto como separador decimal.\n\nO valor de valor_unitario * quantidade deve ser exatamente igual a valor_total.\n\nSe os valores extraídos inicialmente não baterem, ajuste quantidade ou valor_unitario conforme indicado no texto para que a multiplicação seja exata.\n\nvalor_total deve ser sempre maior ou igual a valor_unitario.\n\nRetorne somente o JSON final, sem nada mais.\n\nSe houver mais de um produto, retorne um array de objetos JSON.\n\nIgnore qualquer texto irrelevante do documento.\n\nSe a lista for muito longa e houver risco de truncamento, divida a saída em partes sequenciais, mas garanta que cada parte seja um JSON válido, e depois combine-as para formar o JSON final completo.\n\nInstrução extra:\n\nCertifique-se de incluir todos os produtos completos presentes no texto, mesmo que a lista seja extensa.\n\nMantenha o formato exatamente como especificado, sem comentários ou explicações.\n\nIgnore qualquer código numérico de 9 dígitos.\n\nIgnore qualquer número de 3 dígitos que finalize com: 00, 10, 20, 30, 40, 41, 50, 51, 60, 70, 90.\n\nIgnore qualquer código de 4 dígitos que finalize com: 101, 102, 103, 201, 202, 203, 300, 400, 500, 900.",
+        "model": "openai/gpt-oss-20b",
         "options": {
-          "returnIntermediateSteps": false
+          "maxTokensToSample": 20000,
+          "temperature": 0.5
         }
       },
-      "type": "@n8n/n8n-nodes-langchain.agent",
-      "typeVersion": 2.2,
+      "type": "@n8n/n8n-nodes-langchain.lmChatGroq",
+      "typeVersion": 1,
       "position": [
-        640,
+        608,
         112
       ],
-      "id": "9622f34b-2b52-407b-94d7-1462fefaa851",
-      "name": "AI Agent"
-    },
-    {
-      "parameters": {
-        "conditions": {
-          "options": {
-            "caseSensitive": true,
-            "leftValue": "",
-            "typeValidation": "loose",
-            "version": 2
-          },
-          "conditions": [
-            {
-              "id": "2bdff67c-e157-40f0-8bff-679a91e3c5df",
-              "leftValue": "={{ $json.produtos.some(item => item.produto) }}",
-              "rightValue": "",
-              "operator": {
-                "type": "string",
-                "operation": "exists",
-                "singleValue": true
-              }
-            },
-            {
-              "id": "6c216993-5dab-4254-81f4-eb96d3a12bc0",
-              "leftValue": "={{ $json.produtos.some(item => item.valor_unitario) }}",
-              "rightValue": "",
-              "operator": {
-                "type": "number",
-                "operation": "exists",
-                "singleValue": true
-              }
-            },
-            {
-              "id": "da524bb2-eaed-4cb6-ac82-e2ffc37a168f",
-              "leftValue": "={{ $json.produtos.some(item => item.quantidade) }}",
-              "rightValue": "",
-              "operator": {
-                "type": "number",
-                "operation": "exists",
-                "singleValue": true
-              }
-            },
-            {
-              "id": "fe4582b7-ef6d-4991-bead-5c92ed560b48",
-              "leftValue": "={{ $json.produtos.some(item => item.valor_total) }}",
-              "rightValue": "",
-              "operator": {
-                "type": "number",
-                "operation": "exists",
-                "singleValue": true
-              }
-            }
-          ],
-          "combinator": "and"
-        },
-        "looseTypeValidation": true,
-        "options": {
-          "ignoreCase": ""
+      "id": "943002c2-b019-4c35-a729-dcd91c4b04c1",
+      "name": "Secundário",
+      "credentials": {
+        "groqApi": {
+          "id": "Dc7vL5H0Vo1ghi2a",
+          "name": "Groq account 2"
         }
-      },
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 2.2,
-      "position": [
-        1104,
-        48
-      ],
-      "id": "e199adec-09ef-477a-a1c1-cd7b093843b7",
-      "name": "If"
+      }
     },
     {
       "parameters": {
-        "content": "## Webhook\n\nUse o webhook para receber uma requisição de um front ou backend, ele espera receber um pdf\n"
-      },
-      "type": "n8n-nodes-base.stickyNote",
-      "position": [
-        128,
-        96
-      ],
-      "typeVersion": 1,
-      "id": "191087da-040a-4129-b6a5-f50ffc2c0d81",
-      "name": "Sticky Note"
-    },
-    {
-      "parameters": {
-        "content": "## Ai Agent\n\nO Agente recebe o pdf e extrai informações conforme o prompt que receber"
-      },
-      "type": "n8n-nodes-base.stickyNote",
-      "position": [
-        640,
-        -64
-      ],
-      "typeVersion": 1,
-      "id": "cb3bdf86-4c1f-4e8a-bce9-7dec5a0a0a96",
-      "name": "Sticky Note1"
-    },
-    {
-      "parameters": {
-        "jsCode": "  let teste = $input.first().json.output.replace(\"]]\", ']').replace(\"[[\", '[')\n  if(!teste.includes(\"[{\") || !teste.includes(\"}]\")){\n    teste = `[{${teste}}]`.replace(\"{{\", \"{\").replace(\"}}\", \"}\")\n  }\n  teste.replaceAll(\"\\n\", \"\").replaceAll(\"    \", \"\")\n  const result = JSON.parse(teste) || {produtos: null}\n\n  return {produtos: result}"
+        "mode": "runOnceForEachItem",
+        "jsCode": "const texto = $json.campo_1;\nconst regexChave = /(?:\\b\\d{4}\\b\\s?){11}/g;\nconst regexData = /(0[1-9]|[12][0-9]|3[01])\\/(0[1-9]|1[0-2])\\/\\d{4}/;\n\nlet matchChave = texto.match(regexChave);\nif (!matchChave) matchChave = texto.match(/(?:\\d\\s*){44}/g);\nconst matchData = texto.match(regexData);\n\nconst chave = matchChave[0].replaceAll(\" \", \"\").replaceAll(\"\\n\", \"\");\nif (!chave) return { Erro: \"Erro ao capturar a chave\" };\nconst emissao = matchData[0];\nif (!emissao) return { Erro: \"Erro ao capturar a data de emissão\" };\n\nconst numero = chave.slice(25, 34).replaceAll(\"\\n\", \"\");\nconst cnpj = chave.slice(6, 20).replaceAll(\"\\n\", \"\");\n\nif (!cnpj) return { Erro: \"Erro ao capturar a CNPJ\" };\n\nconst url = `https://www.receitaws.com.br/v1/cnpj/${cnpj}`;\nconst urlFallback = `https://brasilapi.com.br/api/cnpj/v1/${cnpj}`;\n\n// function wait(ms) {\n//   return new Promise((resolve) => setTimeout(resolve, ms));\n// }\n// await wait(1000);\n\nasync function teste(url) {\n  const a = await this.helpers.request({\n    method: \"GET\",\n    url: url,\n    json: true,\n    headers: {\n      \"User-Agent\": \"n8n\",\n    },\n  });\n  return a;\n}\n\nlet response;\ntry {\n  response = await teste(url);\n} catch(e) {\n  response = await teste(urlFallback);\n}\n\nconst emitente = response.fantasia || response.nome || response.nome_fantasia || response.razao_social;\n\nif (!emitente) return { Erro: \"Erro ao capturar o emitente\" };\n\nreturn { index: $itemIndex, chave, numero, cnpj, emissao, emitente };\n"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        912,
-        48
+        560,
+        -192
       ],
-      "id": "57d4d89f-3ebd-411f-a845-1e7b38ed2483",
-      "name": "Verificar Nulos"
+      "id": "8f31767d-5e85-4259-959c-c40e3e88edb6",
+      "name": "Get info NFe"
     },
     {
       "parameters": {
-        "content": "## Verificar Nulos\n\nVerifica se o valor de cada chave é nulo, se sim entra no loop"
-      },
-      "type": "n8n-nodes-base.stickyNote",
-      "position": [
-        896,
-        -128
-      ],
-      "typeVersion": 1,
-      "id": "52e230a2-8e51-41fd-a99c-1ff58fc24d0e",
-      "name": "Sticky Note2"
-    },
-    {
-      "parameters": {
-        "content": "## Sinalizador de erros\n\nRetorna os valores considerados errados e uma variável que sinaliza que houve um erro na execução anterior",
-        "height": 192
-      },
-      "type": "n8n-nodes-base.stickyNote",
-      "position": [
-        1216,
-        336
-      ],
-      "typeVersion": 1,
-      "id": "d4167bee-83ff-4357-be5b-514181f56b9f",
-      "name": "Sticky Note3"
-    },
-    {
-      "parameters": {
-        "assignments": {
-          "assignments": [
-            {
-              "id": "1efaf047-3270-4aa4-9f8d-300baca871c2",
-              "name": "params",
-              "value": "={{ $('Webhook').item.json.params = {produto: $json.produto, valor_unitario: $json.valor_unitario, quantidade: $json.quantidade, valor_total: $json.valor_total} }}",
-              "type": "string"
-            }
-          ]
-        },
-        "includeOtherFields": true,
+        "mode": "combine",
+        "fieldsToMatchString": "index",
         "options": {}
       },
-      "type": "n8n-nodes-base.set",
-      "typeVersion": 3.4,
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
       "position": [
-        1264,
-        176
+        976,
+        -176
       ],
-      "id": "ce18b5ce-c666-4ab6-aa3e-8baef47bb0f5",
-      "name": "Sinalizador de erros"
+      "id": "5ae535bb-6d4b-4941-abee-68bc20cf2222",
+      "name": "Merge and await data"
     },
     {
       "parameters": {
-        "jsCode": "const texto = $input.first().json.body.results.campo_1\n\nconst regexChave = /(?:\\b\\d{4}\\b\\s?){11}/g;\nconst regexData = /(0[1-9]|[12][0-9]|3[01])\\/(0[1-9]|1[0-2])\\/\\d{4}/\n\nlet matchChave = texto.match(regexChave);\nif(!matchChave) matchChave = texto.match(/(?:\\d\\s*){44}/g)\nconst matchData = texto.match(regexData);\n\nconst chave = matchChave[0].replaceAll(\" \", \"\").replaceAll(\"\\n\", \"\")\nif(!chave) return {\"Erro\": \"Erro ao capturar a chave\"}\nconst emissao = matchData[0]\nif(!emissao) return {\"Erro\": \"Erro ao capturar a data de emissão\"}\n\nconst numero = chave.slice(25, 34).replaceAll(\"\\n\", \"\")\nconst cnpj = chave.slice(6, 20).replaceAll(\"\\n\", \"\")\n\nif(!cnpj) return {\"Erro\": \"Erro ao capturar a CNPJ\"}\n\nconst url = `https://www.receitaws.com.br/v1/cnpj/${cnpj}`;\n\nconst response = await this.helpers.request({\n    method: 'GET',\n    url: url,\n    json: true,\n    headers: {\n        'User-Agent': 'n8n',\n    },\n});\n\nconst emitente = response.fantasia || response.nome\n\nif(!emitente) return {\"Erro\": \"Erro ao capturar o emitente\"}\n\nreturn {chave, numero, cnpj, emissao, emitente}"
+        "batchSize": "={{ $input.last().json.comp }}",
+        "options": {}
       },
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
       "position": [
-        544,
-        -160
+        384,
+        -144
       ],
-      "id": "e2df5698-414d-4cb2-a4be-546de3078dd5",
-      "name": "Capturar chave"
+      "id": "eaf0f970-187d-4087-a5c4-062f10f1dd4b",
+      "name": "Loop Over NFs"
     },
     {
       "parameters": {},
       "type": "n8n-nodes-base.merge",
       "typeVersion": 3.2,
       "position": [
-        1312,
+        240,
         -144
       ],
-      "id": "9d940474-06fd-430d-bbeb-9a4383b13520",
-      "name": "Merge"
+      "id": "f10a518e-b587-41d9-8b9d-8551fa39e4ac",
+      "name": "Merge and treat data"
     },
     {
       "parameters": {
-        "jsCode": "console.log($input.all())\nreturn $input.all()"
+        "jsCode": "let a = {}\n$input.first().json.body.finalResult.forEach((item, i)=>{\n  a[i] = item\n})\n\nreturn Object.values(a)"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1520,
-        -144
+        80,
+        -208
       ],
-      "id": "2c4f0eea-51ee-40e4-8d6a-f617954fecf4",
-      "name": "Code"
+      "id": "a9c7782a-a21e-4410-8d38-7fede0afa6b7",
+      "name": "Format NF data"
     },
     {
       "parameters": {
-        "content": "## Merge\n\nAguarda toda a informação carregar"
+        "jsCode": "return [{comp: $input.first().json.body.finalResult.length}];"
       },
-      "type": "n8n-nodes-base.stickyNote",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
       "position": [
-        1344,
-        0
+        80,
+        -80
       ],
-      "typeVersion": 1,
-      "id": "c0fa5d3e-2945-46ca-94c4-feb2e59cdd54",
-      "name": "Sticky Note4"
+      "id": "b23faf6a-eb42-4e6a-84d1-432862727fba",
+      "name": "Get length data"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "let produtos = JSON.parse($json.output)\nif(!Array.isArray(produtos)) produtos = [produtos]\nreturn {index: $itemIndex, produtos};\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        832,
+        -80
+      ],
+      "id": "57d4d89f-3ebd-411f-a845-1e7b38ed2483",
+      "name": "Format JSON"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        }
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1136,
+        -176
+      ],
+      "id": "abe83755-d833-474f-82d7-7bc4124a51d3",
+      "name": "Append row in sheet"
     }
   ],
   "pinData": {},
@@ -271,19 +205,30 @@
       "main": [
         [
           {
-            "node": "Capturar chave",
+            "node": "Format NF data",
             "type": "main",
             "index": 0
           },
           {
-            "node": "AI Agent",
+            "node": "Get length data",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Groq Chat Model": {
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Format JSON",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Principal": {
       "ai_languageModel": [
         [
           {
@@ -294,75 +239,90 @@
         ]
       ]
     },
-    "AI Agent": {
-      "main": [
+    "Secundário": {
+      "ai_languageModel": [
         [
           {
-            "node": "Verificar Nulos",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "If": {
-      "main": [
-        [
-          {
-            "node": "Merge",
-            "type": "main",
+            "node": "AI Agent",
+            "type": "ai_languageModel",
             "index": 1
           }
-        ],
+        ]
+      ]
+    },
+    "Get info NFe": {
+      "main": [
         [
           {
-            "node": "Sinalizador de erros",
+            "node": "Merge and await data",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Verificar Nulos": {
+    "Merge and await data": {
       "main": [
-        [
-          {
-            "node": "If",
-            "type": "main",
-            "index": 0
-          }
-        ]
+        []
       ]
     },
-    "Sinalizador de erros": {
+    "Loop Over NFs": {
       "main": [
+        [],
         [
           {
             "node": "AI Agent",
             "type": "main",
             "index": 0
-          }
-        ]
-      ]
-    },
-    "Capturar chave": {
-      "main": [
-        [
+          },
           {
-            "node": "Merge",
+            "node": "Get info NFe",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Merge": {
+    "Merge and treat data": {
       "main": [
         [
           {
-            "node": "Code",
+            "node": "Loop Over NFs",
             "type": "main",
             "index": 0
+          }
+        ]
+      ]
+    },
+    "Format NF data": {
+      "main": [
+        [
+          {
+            "node": "Merge and treat data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get length data": {
+      "main": [
+        [
+          {
+            "node": "Merge and treat data",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Format JSON": {
+      "main": [
+        [
+          {
+            "node": "Merge and await data",
+            "type": "main",
+            "index": 1
           }
         ]
       ]
@@ -372,7 +332,7 @@
   "settings": {
     "executionOrder": "v1"
   },
-  "versionId": "113bad7b-b626-4a5e-8e94-5e70d24036d3",
+  "versionId": "a210887c-109a-4af5-ae51-c2eac6469486",
   "meta": {
     "templateCredsSetupCompleted": true,
     "instanceId": "abcf850f40a6c353be28eb69764fc3b8fe368ebccc4df1352134ea3af8b93e1d"

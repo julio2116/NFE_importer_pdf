@@ -74,7 +74,7 @@
         <h1>Importar PDF NFe</h1>
         <p>Selecione um arquivo PDF para extrair informações:</p>
         
-        <input type="file" id="pdfInput" accept=".pdf" />
+        <input type="file" id="pdfInput" accept=".pdf" multiple />
         
         <button id="processBtn" disabled>Processar PDF</button>
         
@@ -88,7 +88,7 @@
     pdfjsLib.GlobalWorkerOptions.workerSrc =
         "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
 
-    let currentPdf = null;
+    let currentPdf = [];
     let pdfArrayBuffer = null;
 
     function parseRegions(pages) {
@@ -126,13 +126,19 @@
         return areas;
     }
 
-    async function ensurePdfLoaded(file) {
-        pdfArrayBuffer = await file.arrayBuffer();
-        currentPdf = await pdfjsLib.getDocument({ data: pdfArrayBuffer }).promise;
+    async function ensurePdfLoaded(files) {
+        console.log(files)
+        for(let i = 0; i < files.length; i++){
+            pdfArrayBuffer = await files[i].arrayBuffer();
+            const a = await pdfjsLib.getDocument({ data: pdfArrayBuffer }).promise;
+            currentPdf.push(a)
+        }
     }
 
+
+
     // Extrai texto nativo do PDF dentro de uma região
-    async function textFromRegion(pageIndex, region, scale) {
+    async function textFromRegion(pageIndex, region, scale, currentPdf) {
         const page = await currentPdf.getPage(pageIndex);
         const viewport = page.getViewport({ scale });
         const content = await page.getTextContent();
@@ -190,6 +196,7 @@
             prev = b;
         }
         // Preserva quebras de linha e limpa apenas espaços extras
+        
         let result = out.trim();
         
         // Remove espaços extras mas mantém quebras de linha
@@ -202,7 +209,7 @@
     }
 
     // Corta uma região de uma página renderizada (com padding opcional)
-    async function cropRegion(pageIndex, region, scale) {
+    async function cropRegion(pageIndex, region, scale, currentPdf) {
         const page = await currentPdf.getPage(pageIndex);
         const viewport = page.getViewport({ scale });
         const tmpCanvas = document.createElement('canvas');
@@ -294,9 +301,6 @@
         }
         
         resultsDiv.textContent = displayText;
-        
-        // Também mostra o JSON completo
-        console.log('Resultados completos:', results);
     }
 
     async function processAndSend() {
@@ -310,9 +314,10 @@
         const webhook = 'http://localhost:5678/webhook-test/uploadpdf';
         const numPages = currentPdf.numPages;
 
-        let regions;
+        let regionsArray = [];
         try {
             regions = parseRegions(numPages);
+            console.log(regions)
         } catch (e) {
             showStatus('Erro ao processar regiões: ' + e.message, 'error');
             return;
@@ -320,40 +325,41 @@
         
         const scale = 2.0;
         const lang = 'por'; // Português para OCR
-        const results = {};
+        let finalResult = [];
         
         showStatus(`Processando ${regions.length} região(ões) com OCR...`, 'info');
         
-        for (let i = 0; i < regions.length; i++) {
-            const region = regions[i];
-            const pageIdx = Math.max(1, region.page | 0);
-            
-            showStatus(`Processando região ${i + 1}/${regions.length}: ${region.name} (página ${pageIdx})...`, 'info');
-            
-            // Primeiro tenta texto nativo do PDF nessa região
-            let text = await textFromRegion(pageIdx, region, scale);
-            
-            if (!text || text.trim().length < 3) {
-                // Fallback: OCR mais preciso (lento)
-                showStatus(`Texto nativo insuficiente, aplicando OCR na região ${region.name}...`, 'info');
-                const crop = await cropRegion(pageIdx, region, scale);
-                text = await ocrCanvas(crop, lang, { 
-                    whitelist: region.whitelist, 
-                    psm: region.psm 
-                });
+        for(let j = 0; j < currentPdf.length; j++){
+            const results = {};
+            for (let i = 0; i < regions.length; i++) {
+                const region = regions[i];
+                const pageIdx = Math.max(1, region.page | 0);
+                
+                showStatus(`Processando região ${i + 1}/${regions.length}: ${region.name} (página ${pageIdx})...`, 'info');
+                
+                // Primeiro tenta texto nativo do PDF nessa região
+                let text = await textFromRegion(pageIdx, region, scale, currentPdf[j]);
+                
+                if (!text || text.trim().length < 3) {
+                    // Fallback: OCR mais preciso (lento)
+                    showStatus(`Texto nativo insuficiente, aplicando OCR na região ${region.name}...`, 'info');
+                    const crop = await cropRegion(pageIdx, region, scale, currentPdf[j]);
+                    text = await ocrCanvas(crop, lang, { 
+                        whitelist: region.whitelist, 
+                        psm: region.psm 
+                    });
+                }
+                
+                results[region.name || `p${pageIdx}_${region.x}_${region.y}`] = text;
             }
-            
-            results[region.name || `p${pageIdx}_${region.x}_${region.y}`] = text;
+            finalResult.push(results)
         }
-
-        // Mostra os resultados na tela
-        showResults(results);
 
         try {
             const resp = await fetch(webhook, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ results }),
+                body: JSON.stringify({ finalResult }),
             });
 
             if (resp.ok) {
@@ -368,10 +374,10 @@
     }
 
     document.getElementById("pdfInput").addEventListener("change", async (e) => {
-        const file = e.target.files && e.target.files[0];
+        const files = e.target.files // pegar todos
         const processBtn = document.getElementById("processBtn");
         
-        if (!file) {
+        if (!files) {
             processBtn.disabled = true;
             showStatus('', '');
             document.getElementById('results').textContent = '';
@@ -380,7 +386,7 @@
         
         try {
             showStatus('Carregando PDF...', 'info');
-            await ensurePdfLoaded(file);
+            await ensurePdfLoaded(files);
             processBtn.disabled = false;
             showStatus(`PDF carregado com sucesso! ${currentPdf.numPages} página(s) encontrada(s).`, 'success');
         } catch (err) {
