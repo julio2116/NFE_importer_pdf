@@ -37,16 +37,16 @@
     },
     {
       "parameters": {
-        "model": "openai/gpt-oss-120b",
+        "model": "moonshotai/kimi-k2-instruct-0905",
         "options": {
-          "maxTokensToSample": 20000,
-          "temperature": 0.5
+          "maxTokensToSample": 16384,
+          "temperature": 0.3
         }
       },
       "type": "@n8n/n8n-nodes-langchain.lmChatGroq",
       "typeVersion": 1,
       "position": [
-        512,
+        496,
         112
       ],
       "id": "ed3220ca-7865-418e-a7ec-059ebe5d53d0",
@@ -63,7 +63,7 @@
         "model": "openai/gpt-oss-20b",
         "options": {
           "maxTokensToSample": 20000,
-          "temperature": 0.5
+          "temperature": 0.3
         }
       },
       "type": "@n8n/n8n-nodes-langchain.lmChatGroq",
@@ -332,7 +332,7 @@
   "settings": {
     "executionOrder": "v1"
   },
-  "versionId": "a210887c-109a-4af5-ae51-c2eac6469486",
+  "versionId": "0b800afd-d563-4fbc-9bbc-96df1da857a9",
   "meta": {
     "templateCredsSetupCompleted": true,
     "instanceId": "abcf850f40a6c353be28eb69764fc3b8fe368ebccc4df1352134ea3af8b93e1d"
